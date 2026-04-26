@@ -115,9 +115,18 @@
         model.add(tf.layers.dense({units: 1, inputShape: [1]}));
 
         // Используем SGD с низким learning rate для стабильности на малых данных
-        const optimizer = tf.train.sgd(0.001); 
-        model.compile({loss: 'meanSquaredError', optimizer: optimizer});
+       // Чуть-чуть увеличим скорость (0.01 вместо 0.001)
+const optimizer = tf.train.adam(0.1); 
+model.compile({loss: 'meanSquaredError', optimizer: optimizer});
 
+async function trainModel() {
+    // ... остальной код тот же ...
+    await model.fit(xs, ys, {
+        epochs: 1000, // С adam даже 1000 хватит за глаза
+        shuffle: true
+    });
+    // ...
+}
         // 2. Данные (C -> F)
         const xs = tf.tensor2d([-40, -10, 0, 8, 15, 22, 38], [7, 1]);
         const ys = tf.tensor2d([-40, 14, 32, 46.4, 59, 71.6, 100.4], [7, 1]);
