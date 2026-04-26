@@ -1,46 +1,147 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Temperature AI</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 20px; }
-        input { padding: 10px; width: 80%; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
-        button { padding: 10px 20px; background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); border: none; border-radius: 8px; cursor: pointer; }
-        #result { margin-top: 20px; font-weight: bold; font-size: 20px; color: #e74c3c; }
+        :root {
+            --bg: var(--tg-theme-bg-color, #1a1a1a);
+            --text: var(--tg-theme-text-color, #ffffff);
+            --hint: var(--tg-theme-hint-color, #7f8c8d);
+            --btn: var(--tg-theme-button-color, #e67e22);
+            --btn-text: var(--tg-theme-button-text-color, #ffffff);
+            --card: var(--tg-theme-secondary-bg-color, #2c3e50);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 400px;
+            padding: 30px;
+            background: var(--card);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        h2 { margin-bottom: 10px; font-weight: 700; color: var(--btn); }
+        .sub { font-size: 14px; color: var(--hint); margin-bottom: 25px; }
+
+        .input-group { position: relative; margin-bottom: 20px; }
+        
+        input {
+            width: 100%;
+            padding: 15px;
+            background: var(--bg);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 20px;
+            text-align: center;
+            outline: none;
+            transition: 0.3s;
+            box-sizing: border-box;
+        }
+
+        input:focus { border-color: var(--btn); }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: var(--btn);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #result {
+            margin-top: 25px;
+            font-size: 24px;
+            font-weight: 700;
+            min-height: 30px;
+        }
+
+        .loader {
+            font-size: 12px;
+            color: var(--btn);
+            margin-top: 10px;
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <h2>AI Конвертер Температуры</h2>
-    <input type="number" id="celsiusInput" placeholder="Градусы Цельсия">
-    <br>
-    <button onclick="predict()">Посчитать Нейросетью</button>
-    <div id="result">Ожидаю ввода...</div>
+    <div class="container">
+        <h2>Temperature AI 🌡️</h2>
+        <p class="sub">Линейная регрессия на TensorFlow.js</p>
+        
+        <div class="input-group">
+            <input type="number" id="celsiusInput" placeholder="°C (Цельсий)">
+        </div>
+
+        <button id="predictBtn" onclick="predict()" disabled>Обучение...</button>
+        <div id="loader" class="loader">ИИ подбирает веса...</div>
+
+        <div id="result">Жду ввода...</div>
+    </div>
 
     <script>
-        // Инициализация Telegram Mini App
         const tg = window.Telegram.WebApp;
+        tg.ready();
         tg.expand();
 
-        // 2. МОДЕЛЬ ИИ (Аналог твоего PyTorch кода)
+        // 1. Создаем модель
         const model = tf.sequential();
         model.add(tf.layers.dense({units: 1, inputShape: [1]}));
-        model.compile({loss: 'meanSquaredError', optimizer: 'adam'});
 
-        // Данные для обучения (те же, что были в тензорах torch)
+        // Используем SGD с низким learning rate для стабильности на малых данных
+        const optimizer = tf.train.sgd(0.001); 
+        model.compile({loss: 'meanSquaredError', optimizer: optimizer});
+
+        // 2. Данные (C -> F)
         const xs = tf.tensor2d([-40, -10, 0, 8, 15, 22, 38], [7, 1]);
         const ys = tf.tensor2d([-40, 14, 32, 46.4, 59, 71.6, 100.4], [7, 1]);
 
-        // Обучение при запуске
-        async function train() {
-            document.getElementById('result').innerText = "Обучаю нейросеть...";
-            await model.fit(xs, ys, {epochs: 500});
-            document.getElementById('result').innerText = "Готов к работе!";
+        async function trainModel() {
+            const btn = document.getElementById('predictBtn');
+            const loader = document.getElementById('loader');
+            loader.style.display = 'block';
+
+            // Обучаем 1500 эпох для высокой точности
+            await model.fit(xs, ys, {
+                epochs: 1500,
+                callbacks: {
+                    onEpochEnd: (epoch, logs) => {
+                        if(epoch % 100 === 0) console.log(`Эпоха ${epoch}: loss = ${logs.loss}`);
+                    }
+                }
+            });
+
+            loader.style.display = 'none';
+            btn.innerText = 'Посчитать ИИ';
+            btn.disabled = false;
+            document.getElementById('result').innerText = 'Готов!';
         }
-        train();
 
         async function predict() {
             const val = parseFloat(document.getElementById('celsiusInput').value);
@@ -49,8 +150,14 @@
             const output = model.predict(tf.tensor2d([val], [1, 1]));
             const prediction = (await output.data())[0];
 
-            document.getElementById('result').innerText = `ИИ: ${prediction.toFixed(2)} °F`;
+            document.getElementById('result').style.color = '#e67e22';
+            document.getElementById('result').innerText = `${prediction.toFixed(2)} °F`;
+
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
+
+        // Запуск обучения при загрузке
+        trainModel();
     </script>
 </body>
 </html>
