@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature AI</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 20px; }
+        input { padding: 10px; width: 80%; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); border: none; border-radius: 8px; cursor: pointer; }
+        #result { margin-top: 20px; font-weight: bold; font-size: 20px; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h2>AI Конвертер Температуры</h2>
+    <input type="number" id="celsiusInput" placeholder="Градусы Цельсия">
+    <br>
+    <button onclick="predict()">Посчитать Нейросетью</button>
+    <div id="result">Ожидаю ввода...</div>
+
+    <script>
+        // Инициализация Telegram Mini App
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // 2. МОДЕЛЬ ИИ (Аналог твоего PyTorch кода)
+        const model = tf.sequential();
+        model.add(tf.layers.dense({units: 1, inputShape: [1]}));
+        model.compile({loss: 'meanSquaredError', optimizer: 'adam'});
+
+        // Данные для обучения (те же, что были в тензорах torch)
+        const xs = tf.tensor2d([-40, -10, 0, 8, 15, 22, 38], [7, 1]);
+        const ys = tf.tensor2d([-40, 14, 32, 46.4, 59, 71.6, 100.4], [7, 1]);
+
+        // Обучение при запуске
+        async function train() {
+            document.getElementById('result').innerText = "Обучаю нейросеть...";
+            await model.fit(xs, ys, {epochs: 500});
+            document.getElementById('result').innerText = "Готов к работе!";
+        }
+        train();
+
+        async function predict() {
+            const val = parseFloat(document.getElementById('celsiusInput').value);
+            if (isNaN(val)) return;
+
+            const output = model.predict(tf.tensor2d([val], [1, 1]));
+            const prediction = (await output.data())[0];
+
+            document.getElementById('result').innerText = `ИИ: ${prediction.toFixed(2)} °F`;
+        }
+    </script>
+</body>
+</html>
